@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "incremental": true,
+    "declaration": true,
+    "target": "es2015",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "lib": ["ESNext", "DOM"],
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "stripInternal": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "plugins": [
+      {
+        "name": "typescript-eslint-language-service"
+      }
+    ],
+    "paths": {
+      "reg-suit-interface": ["./reg-suit-interface/src/index.ts"],
+      "reg-suit-util": ["./reg-suit-util/src/index.ts"]
+    }
+  },
+  "exclude": ["lib"]
+}
