@@ -2,14 +2,9 @@ import fs from "fs";
 import path from "path";
 import * as fflate from "fflate";
 import {
-  GenericProjectFileShowRequest,
-  V0ProjectFileStorageResponseModel,
-  GenericProjectFileListRequest,
-  V0ProjectFileStorageListResponseModel,
-  GenericProjectFilesCreateRequest,
-  V0ProjectFileStorageUploadParams,
-  GenericProjectFileApi,
   Configuration,
+  BuildsApi,
+  BuildArtifactApi,
 } from "@novr/bitrise-api";
 import mkdirp from "mkdirp";
 import _ from "lodash";
@@ -18,13 +13,13 @@ import { PublisherPlugin, PluginCreateOptions, WorkingDirectoryInfo } from "reg-
 import { FileItem, RemoteFileItem, ObjectListResult, AbstractPublisher } from "reg-suit-util";
 
 export interface PluginConfig {
-  basePath?: string;
   pattern?: string;
-  appSlug: string;
-  buildSlug: string;
-  apiKey: string;
-  customDomain?: string;
   pathPrefix?: string;
+  basePath?: string;
+  apiKey: string;
+  appSlug?: string;
+  successOnly?: Boolean;
+  artifactName?: string;
 }
 
 export class BitrisePublisherPlugin extends AbstractPublisher implements PublisherPlugin<PluginConfig> {
@@ -32,7 +27,8 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
 
   private _options!: PluginCreateOptions<any>;
   private _pluginConfig!: PluginConfig;
-  private _bitriseClient!: GenericProjectFileApi;
+  private _buildsApi!: BuildsApi;
+  private _buildArtifactApi!: BuildArtifactApi;
 
   constructor() {
     super();
@@ -49,15 +45,34 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
       basePath: this._pluginConfig.basePath,
       apiKey: this._pluginConfig.apiKey,
     });
-    this._bitriseClient = new GenericProjectFileApi(configuration);
+    this._buildsApi = new BuildsApi(configuration);
+    this._buildArtifactApi = new BuildArtifactApi(configuration);
   }
 
-  protected getBucketDomain() {
-    if (this._pluginConfig.customDomain) {
-      return this._pluginConfig.customDomain;
+  private getAppSlug() {
+    if (this._pluginConfig.appSlug) {
+      return this._pluginConfig.appSlug;
+    } else if (process.env.BITRISE_APP_SLUG) {
+      return process.env.BITRISE_APP_SLUG;
     } else {
-      return `app.bitrise.io`;
+      throw new Error(`'The appSlug is missing'`);
     }
+  }
+
+  private getArtifactName() {
+    return this._pluginConfig.artifactName ?? "artifact";
+  }
+
+  private getBuildDeployDir() {
+    if (process.env.BITRISE_DEPLOY_DIR) {
+      return process.env.BITRISE_DEPLOY_DIR;
+    } else {
+      return this.getWorkingDirs().base;
+    }
+  }
+
+  private getBuildUrl() {
+    return process.env.BITRISE_BUILD_URL;
   }
 
   protected getBucketRootDir(): string | undefined {
@@ -65,7 +80,7 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   }
 
   protected getBucketName(): string {
-    return this._pluginConfig.appSlug;
+    return this.getAppSlug();
   }
 
   protected getLocalGlobPattern(): string | undefined {
@@ -77,8 +92,8 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   }
 
   publish(key: string) {
-    return this.publishInternal(key).then(({ indexFile }) => {
-      const reportUrl = indexFile && `https://${this.getBucketDomain()}/${this.resolveInBucket(key)}/${indexFile.path}`;
+    return this.publishInternal(key).then(() => {
+      const reportUrl = `${this.getBuildUrl()}/?tab=artifacts`;
       return { reportUrl };
     });
   }
@@ -86,14 +101,14 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   protected createList(): Promise<FileItem[]> {
     return super.createList()
       .then((list) => {
-        return this.compress(list, "files.zip");
+        return this.compress(list, `${this.getArtifactName()}.zip`);
       })
-      .then((compressedFile) => {
-        return [compressedFile];
+      .then((file) => {
+        return [file];
       });
   }
 
-  protected compress(
+  protected async compress(
     files: FileItem[],
     filename: string,
     compressOptions: fflate.ZipOptions | undefined = undefined
@@ -111,55 +126,23 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
       fileContents[f.path] = readFileSyncAndConvert(f.absPath);
     });
   
-    const zipFile = path.join(this.getWorkingDirs().base, filename);
-    return Promise.all(promises)
-      .then(() => {
-        const zippedContent = fflate.zipSync(fileContents, options);
-        fs.writeFileSync(zipFile, zippedContent);
-        return {
-          path: filename,
-          absPath: zipFile,
-          mimeType: "application/zip",
-        } as FileItem;
-      })
-      .catch((err) => {
-        throw new Error(`compress failed: ${err}`);
-      });
+    const zipFile = path.join(this.getBuildDeployDir(), filename);
+    try {
+      await Promise.all(promises);
+      const zippedContent = fflate.zipSync(fileContents, options);
+      fs.writeFileSync(zipFile, zippedContent);
+      return {
+        path: filename,
+        absPath: zipFile,
+        mimeType: "application/zip",
+      } as FileItem;
+    } catch (err) {
+      throw new Error(`compress failed: ${err}`);
+    }
   }
 
-  protected uploadItem(key: string, item: FileItem): Promise<FileItem> {
-    return new Promise((resolve, reject) => {
-      fs.readFile(item.absPath, (err, content) => {
-        if (err) return reject(err);
-        const file: V0ProjectFileStorageUploadParams = {
-          uploadFileName: item.path,
-          uploadFileSize: content.length,
-          userEnvKey: `${this.resolveInBucket(key)}/${path.basename(this.getWorkingDirs().actualDir)}/${item.path}`
-        }
-        const req: GenericProjectFilesCreateRequest = {
-          appSlug: this._pluginConfig.appSlug,
-          genericProjectFile: file
-        };
-        this._bitriseClient
-          .genericProjectFilesCreate(req)
-          .then((result) => {
-            return fetch(`${result.data!.uploadUrl}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': item.mimeType
-              },
-              body: content
-            })
-          })
-          .then(() => {
-            this.logger.verbose(`Uploaded from ${item.absPath} to ${key}/${item.path}`);
-            return resolve(item);
-          })
-          .catch(err => {
-            return reject(err);
-          });
-      });
-    });
+  protected uploadItem(_key: string, item: FileItem): Promise<FileItem> {
+    return Promise.resolve(item);
   }
 
   fetch(key: string): Promise<any> {
@@ -167,64 +150,70 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   }
 
   protected listItems(lastKey: string, prefix: string): Promise<ObjectListResult> {
-    const options: GenericProjectFileListRequest = {
-      appSlug: this._pluginConfig.appSlug,
-      limit: 50,
-    };
-    if (lastKey) {
-      options.next = lastKey;
+    // Build Success Only by default.
+    if (this._pluginConfig.successOnly == undefined) {
+      this._pluginConfig.successOnly = true;
     }
-
-    return new Promise<ObjectListResult>((resolve, reject) => {
-      this._bitriseClient
-        .genericProjectFileList(options)
-        .then((result: V0ProjectFileStorageListResponseModel) => {
-          resolve({
-            isTruncated: false,
-            contents: !result.data
-              ? []
-              : result.data.filter(f => f.userEnvKey?.startsWith(prefix)).map(f => ({ key: f.slug })),
-            nextMarker: result.paging?.next,
-          } as ObjectListResult);
-        })
-        .catch(reject);
+    return new Promise<ObjectListResult>(async (resolve, reject) => {
+      try {
+        const key = prefix.split("/")[0]
+        const builds = await this._buildsApi.buildList({
+          appSlug: this.getAppSlug(),
+          status: this._pluginConfig.successOnly ? 1 : undefined,
+          next: lastKey
+        });
+        const build = builds.data?.find(f => f.commitHash?.string?.startsWith(key));
+        let url;
+        if (build?.slug) {
+          let next = undefined
+          let artifact;
+          do {
+            let artifacts = await this._buildArtifactApi.artifactList({
+              appSlug: this.getAppSlug(),
+              buildSlug: build.slug,
+              next: next
+            });
+            artifact = artifacts.data?.find(f => f.title?.string?.startsWith(this.getArtifactName()));
+            next = artifacts.paging?.next;
+          } while (!artifact && next);
+          if (artifact?.slug) {
+            const item = await this._buildArtifactApi.artifactShow({
+              appSlug: this.getAppSlug(),
+              buildSlug: build.slug,
+              artifactSlug: artifact.slug
+            })
+            url = item.data?.expiringDownloadUrl
+          }
+        }
+        resolve({
+          isTruncated: false,
+          contents: !url ? [] : [{ key: url }],
+          nextMarker: url ? undefined : builds.paging?.next,
+        } as ObjectListResult);
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
   protected downloadItem(remoteItem: RemoteFileItem, item: FileItem): Promise<FileItem> {
-    const fileSlug = remoteItem.key;
-    const request: GenericProjectFileShowRequest = {
-      appSlug: this._pluginConfig.appSlug,
-      genericProjectFileSlug: fileSlug,
-    };
-    return new Promise((resolve, reject) => {
-      this._bitriseClient
-        .genericProjectFileShow(request)
-        .then((result: V0ProjectFileStorageResponseModel) => fetch(`${result.data!.downloadUrl}`))
-        .then((response: Response) => {
-          if (!response.ok) {
-            throw new Error(`Failed to download: ${response.statusText}`);
+    return new Promise(async (resolve, reject) => {
+      try {
+        const response = await fetch(remoteItem.key);
+        mkdirp.sync(item.absPath);
+        fflate.unzip(new Uint8Array(await response.arrayBuffer()), (err, unzipped) => {
+          if (err) {
+            reject(err);
+          } else {
+            Object.entries(unzipped).map(([filename, data]) =>
+              fs.writeFileSync(path.join(item.absPath, filename), data),
+            );
+            resolve(item);
           }
-          mkdirp.sync(item.absPath);
-          return response.arrayBuffer();
-        })
-        .then(
-          (buffer: ArrayBuffer) =>
-            new Promise((resolve, reject) => {
-              fflate.unzip(new Uint8Array(buffer), (err, unzipped) => {
-                if (err) {
-                  reject(err);
-                } else {
-                  const promises = Object.entries(unzipped).map(([filename, data]) =>
-                    fs.writeFileSync(path.join(item.absPath, filename), data),
-                  );
-                  resolve(Promise.all(promises));
-                }
-              });
-            }),
-        )
-        .then(() => resolve(item))
-        .catch(reject);
+        });        
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 }

@@ -22,9 +22,7 @@ export class BitrisePreparer implements PluginPreparer<SetupInquireResult, Plugi
     this._logger = config.logger;
     const ir = config.options;
     const pluginConfig: PluginConfig = {
-      appSlug: process.env.BITRISE_APP_SLUG ?? "",
-      buildSlug: process.env.BITRISE_BUILD_SLUG ?? "",
-      apiKey: ir.apiKey,
+      apiKey: ir.apiKey
     };
     return pluginConfig;
   }
