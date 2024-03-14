@@ -1,6 +1,6 @@
 {
   "name": "reg-publish-bitrise-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fetch and publish snapshot images to Bitrise.",
   "regSuitPlugin": {
     "recommended": true
@@ -18,7 +18,10 @@
     "name": "novr",
     "email": "nobuhisa.komiya@gmail.com"
   },
-  "repository": "git+https://github.com/reg-viz/reg-suit.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/novr/reg-publish-bitrise-plugin.git"
+  },
   "license": "MIT",
   "dependencies": {
     "@novr/bitrise-api": "^0.1.4",
