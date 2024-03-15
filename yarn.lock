@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@novr/bitrise-api@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@novr/bitrise-api/-/bitrise-api-0.1.4.tgz#2d030bee27504652cf2e42a5df155094a2fca597"
-  integrity sha512-YBIXH26eYddfB4bo4FgeMkJELJi6Y7mn3RP+KJ9FvZs1L3lq5am0WOOGzX0Q7I0Hap0a34n82HR3fXMnJOm7ww==
+"@novr/bitrise-api@^0.1.5":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@novr/bitrise-api/-/bitrise-api-0.1.5.tgz#452fe280372411a42ce47cf25e7578bfe4d84de8"
+  integrity sha512-tyW2leEa1j02nenpDEt0C9+Tft5/DEbQOhH/+IyMWc71Wd6fQvPWJLj3WbMniCbeTkuI7eTiljLr8dE5iYWiJw==
 
 "@types/cli-progress@^3.8.0":
   version "3.11.5"
