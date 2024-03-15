@@ -1,11 +1,17 @@
-import { PluginPreparer, PluginCreateOptions, PluginLogger } from "reg-suit-interface";
+import {
+  PluginPreparer,
+  PluginCreateOptions,
+  PluginLogger,
+} from "reg-suit-interface";
 import { PluginConfig } from "./bitrise-publisher-plugin";
 
 export interface SetupInquireResult {
   apiKey: string;
 }
 
-export class BitrisePreparer implements PluginPreparer<SetupInquireResult, PluginConfig> {
+export class BitrisePreparer
+  implements PluginPreparer<SetupInquireResult, PluginConfig>
+{
   _logger!: PluginLogger;
 
   inquire() {
@@ -22,7 +28,7 @@ export class BitrisePreparer implements PluginPreparer<SetupInquireResult, Plugi
     this._logger = config.logger;
     const ir = config.options;
     const pluginConfig: PluginConfig = {
-      apiKey: ir.apiKey
+      apiKey: ir.apiKey,
     };
     return pluginConfig;
   }
