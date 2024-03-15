@@ -1,16 +1,20 @@
 import fs from "fs";
 import path from "path";
 import * as fflate from "fflate";
-import {
-  Configuration,
-  BuildsApi,
-  BuildArtifactApi,
-} from "@novr/bitrise-api";
-import mkdirp from "mkdirp";
-import _ from "lodash";
+import { Configuration, BuildsApi, BuildArtifactApi } from "@novr/bitrise-api";
+import { mkdirp } from "mkdirp";
 
-import { PublisherPlugin, PluginCreateOptions, WorkingDirectoryInfo } from "reg-suit-interface";
-import { FileItem, RemoteFileItem, ObjectListResult, AbstractPublisher } from "reg-suit-util";
+import {
+  PublisherPlugin,
+  PluginCreateOptions,
+  WorkingDirectoryInfo,
+} from "reg-suit-interface";
+import {
+  FileItem,
+  RemoteFileItem,
+  ObjectListResult,
+  AbstractPublisher,
+} from "reg-suit-util";
 
 export interface PluginConfig {
   pattern?: string;
@@ -22,7 +26,10 @@ export interface PluginConfig {
   artifactName?: string;
 }
 
-export class BitrisePublisherPlugin extends AbstractPublisher implements PublisherPlugin<PluginConfig> {
+export class BitrisePublisherPlugin
+  extends AbstractPublisher
+  implements PublisherPlugin<PluginConfig>
+{
   name = "reg-publish-bitrise-plugin";
 
   private _options!: PluginCreateOptions<any>;
@@ -67,7 +74,15 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
     if (process.env.BITRISE_DEPLOY_DIR) {
       return process.env.BITRISE_DEPLOY_DIR;
     } else {
-      return this.getWorkingDirs().base;
+      return path.join(this.getWorkingDirs().base, ".deploy");
+    }
+  }
+
+  private getHtmlReportDir() {
+    if (process.env.BITRISE_HTML_REPORT_DIR) {
+      return process.env.BITRISE_HTML_REPORT_DIR;
+    } else {
+      return path.join(this.getWorkingDirs().base, ".report");
     }
   }
 
@@ -92,20 +107,25 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   }
 
   publish(key: string) {
-    return this.publishInternal(key).then(() => {
+    return this.publishInternal(key).then(async (result) => {
+      await this.compress(result.items, `${this.getArtifactName()}.zip`);
       const reportUrl = `${this.getBuildUrl()}/?tab=artifacts`;
       return { reportUrl };
     });
   }
 
-  protected createList(): Promise<FileItem[]> {
-    return super.createList()
-      .then((list) => {
-        return this.compress(list, `${this.getArtifactName()}.zip`);
-      })
-      .then((file) => {
-        return [file];
+  protected uploadItem(_key: string, item: FileItem): Promise<FileItem> {
+    return new Promise(async (resolve, reject) => {
+      const itemPath = path.join(this.getHtmlReportDir(), item.path);
+      await mkdirp(path.dirname(itemPath));
+      fs.copyFile(item.absPath, itemPath, (error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(item);
+        }
       });
+    });
   }
 
   protected async compress(
@@ -115,17 +135,18 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
   ): Promise<FileItem> {
     const options = compressOptions || {};
     const fileContents: Record<string, Uint8Array> = {};
-  
+
     const readFileSyncAndConvert = (filePath: string): Uint8Array => {
       const data = fs.readFileSync(filePath);
       const arrayBuffer = Uint8Array.from(data).buffer;
       return new Uint8Array(arrayBuffer);
     };
-  
-    const promises = files.map((f) => {
-      fileContents[f.path] = readFileSyncAndConvert(f.absPath);
-    });
-  
+
+    const promises = files.map(
+      (f) => (fileContents[f.path] = readFileSyncAndConvert(f.absPath))
+    );
+
+    await mkdirp(this.getBuildDeployDir());
     const zipFile = path.join(this.getBuildDeployDir(), filename);
     try {
       await Promise.all(promises);
@@ -141,76 +162,116 @@ export class BitrisePublisherPlugin extends AbstractPublisher implements Publish
     }
   }
 
-  protected uploadItem(_key: string, item: FileItem): Promise<FileItem> {
-    return Promise.resolve(item);
+  async fetchArtifact(key: string) {
+    let next;
+    do {
+      const builds = await this._buildsApi.buildList({
+        appSlug: this.getAppSlug(),
+        status: this._pluginConfig.successOnly ? 1 : undefined,
+        next: next,
+      });
+      const targets =
+        builds.data?.filter((f) => f.commitHash?.startsWith(key)) ?? [];
+      for (const build of targets) {
+        if (build.slug) {
+          return await this.fetchBuildArtifact(build.slug);
+        }
+      }
+    } while (next);
+  }
+
+  async fetchBuildArtifact(buildSlug: string) {
+    let next;
+    do {
+      let artifacts = await this._buildArtifactApi.artifactList({
+        appSlug: this.getAppSlug(),
+        buildSlug: buildSlug,
+        next: next,
+      });
+      const artifact = artifacts.data?.find((f) =>
+        f.title?.startsWith(this.getArtifactName())
+      );
+      if (artifact?.slug) {
+        return await this._buildArtifactApi.artifactShow({
+          appSlug: this.getAppSlug(),
+          buildSlug: buildSlug,
+          artifactSlug: artifact.slug,
+        });
+      }
+      next = artifacts.paging?.next;
+    } while (next);
   }
 
   fetch(key: string): Promise<any> {
-    return this.fetchInternal(key);
-  }
-
-  protected listItems(lastKey: string, prefix: string): Promise<ObjectListResult> {
-    // Build Success Only by default.
-    if (this._pluginConfig.successOnly == undefined) {
-      this._pluginConfig.successOnly = true;
-    }
-    return new Promise<ObjectListResult>(async (resolve, reject) => {
+    if (this.noEmit) return Promise.resolve();
+    const progress = this.logger.getProgressBar();
+    return new Promise<any>(async (resolve, reject) => {
+      progress.start(1, 0);
+      this.logger.info(
+        `Download 1 files from ${this.logger.colors.magenta(
+          this.getBucketName()
+        )}.`
+      );
       try {
-        const key = prefix.split("/")[0]
-        const builds = await this._buildsApi.buildList({
-          appSlug: this.getAppSlug(),
-          status: this._pluginConfig.successOnly ? 1 : undefined,
-          next: lastKey
-        });
-        const build = builds.data?.find(f => f.commitHash?.string?.startsWith(key));
-        let url;
-        if (build?.slug) {
-          let next = undefined
-          let artifact;
-          do {
-            let artifacts = await this._buildArtifactApi.artifactList({
-              appSlug: this.getAppSlug(),
-              buildSlug: build.slug,
-              next: next
-            });
-            artifact = artifacts.data?.find(f => f.title?.string?.startsWith(this.getArtifactName()));
-            next = artifacts.paging?.next;
-          } while (!artifact && next);
-          if (artifact?.slug) {
-            const item = await this._buildArtifactApi.artifactShow({
-              appSlug: this.getAppSlug(),
-              buildSlug: build.slug,
-              artifactSlug: artifact.slug
-            })
-            url = item.data?.expiringDownloadUrl
-          }
+        const artifact = await this.fetchArtifact(key);
+        const fileItem = {
+          path: "",
+          absPath: this.getWorkingDirs().expectedDir,
+          mimeType: "",
+        } as FileItem;
+        if (artifact?.data?.expiringDownloadUrl) {
+          const remotePath = artifact?.data?.expiringDownloadUrl;
+          await this.downloadItem({ remotePath, key }, fileItem);
+          progress.increment(1);
         }
-        resolve({
-          isTruncated: false,
-          contents: !url ? [] : [{ key: url }],
-          nextMarker: url ? undefined : builds.paging?.next,
-        } as ObjectListResult);
+        progress.stop();
+        resolve(fileItem);
       } catch (error) {
         reject(error);
       }
     });
   }
 
-  protected downloadItem(remoteItem: RemoteFileItem, item: FileItem): Promise<FileItem> {
+  protected listItems(
+    lastKey: string,
+    prefix: string
+  ): Promise<ObjectListResult> {
+    return Promise.reject(new Error(`listItems: ${lastKey},${prefix}`));
+  }
+
+  protected downloadItem(
+    remoteItem: RemoteFileItem,
+    item: FileItem
+  ): Promise<FileItem> {
+    const actualPrefix = `${path.basename(this.getWorkingDirs().actualDir)}`;
     return new Promise(async (resolve, reject) => {
       try {
-        const response = await fetch(remoteItem.key);
-        mkdirp.sync(item.absPath);
-        fflate.unzip(new Uint8Array(await response.arrayBuffer()), (err, unzipped) => {
-          if (err) {
-            reject(err);
-          } else {
-            Object.entries(unzipped).map(([filename, data]) =>
-              fs.writeFileSync(path.join(item.absPath, filename), data),
-            );
-            resolve(item);
+        const response = await fetch(remoteItem.remotePath);
+        fflate.unzip(
+          new Uint8Array(await response.arrayBuffer()),
+          async (err, unzipped) => {
+            if (err) {
+              reject(err);
+            } else {
+              const promise = Object.entries(unzipped).map(
+                async ([filename, data]) => {
+                  const suffix = filename.replace(
+                    new RegExp(`^${actualPrefix}\/`),
+                    ""
+                  );
+                  const file = path.join(item.absPath, suffix);
+                  await mkdirp(path.dirname(file));
+                  fs.writeFileSync(file, data);
+                  this.logger.verbose(
+                    `Downloaded from ${remoteItem.key} to ${filename}`
+                  );
+                }
+              );
+              await Promise.all(promise);
+              resolve(item);
+            }
           }
-        });        
+        );
       } catch (error) {
         reject(error);
       }
