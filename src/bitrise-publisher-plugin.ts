@@ -114,9 +114,9 @@ export class BitrisePublisherPlugin
     });
   }
 
-  protected uploadItem(_key: string, item: FileItem): Promise<FileItem> {
+  protected uploadItem(key: string, item: FileItem): Promise<FileItem> {
     return new Promise(async (resolve, reject) => {
-      const itemPath = path.join(this.getHtmlReportDir(), item.path);
+      const itemPath = path.join(this.getHtmlReportDir(), key, item.path);
       await mkdirp(path.dirname(itemPath));
       fs.copyFile(item.absPath, itemPath, (error) => {
         if (error) {
