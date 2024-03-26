@@ -56,7 +56,7 @@ export class BitrisePublisherPlugin
     this._buildArtifactApi = new BuildArtifactApi(configuration);
   }
 
-  private getAppSlug() {
+  protected getAppSlug() {
     if (this._pluginConfig.appSlug) {
       return this._pluginConfig.appSlug;
     } else if (process.env.BITRISE_APP_SLUG) {
@@ -66,11 +66,11 @@ export class BitrisePublisherPlugin
     }
   }
 
-  private getArtifactName() {
+  protected getArtifactName() {
     return this._pluginConfig.artifactName ?? "artifact";
   }
 
-  private getBuildDeployDir() {
+  protected getBuildDeployDir() {
     if (process.env.BITRISE_DEPLOY_DIR) {
       return process.env.BITRISE_DEPLOY_DIR;
     } else {
@@ -78,7 +78,7 @@ export class BitrisePublisherPlugin
     }
   }
 
-  private getHtmlReportDir() {
+  protected getHtmlReportDir() {
     if (process.env.BITRISE_HTML_REPORT_DIR) {
       return process.env.BITRISE_HTML_REPORT_DIR;
     } else {
@@ -86,23 +86,23 @@ export class BitrisePublisherPlugin
     }
   }
 
-  private getBuildUrl() {
+  protected getBuildUrl() {
     return process.env.BITRISE_BUILD_URL;
   }
 
-  protected getBucketRootDir(): string | undefined {
+  override getBucketRootDir(): string | undefined {
     return this._pluginConfig.pathPrefix;
   }
 
-  protected getBucketName(): string {
+  override getBucketName(): string {
     return this.getAppSlug();
   }
 
-  protected getLocalGlobPattern(): string | undefined {
+  override getLocalGlobPattern(): string | undefined {
     return this._pluginConfig.pattern;
   }
 
-  protected getWorkingDirs(): WorkingDirectoryInfo {
+  override getWorkingDirs(): WorkingDirectoryInfo {
     return this._options.workingDirs;
   }
 
@@ -114,7 +114,7 @@ export class BitrisePublisherPlugin
     });
   }
 
-  protected uploadItem(key: string, item: FileItem): Promise<FileItem> {
+  override uploadItem(key: string, item: FileItem): Promise<FileItem> {
     return new Promise(async (resolve, reject) => {
       const itemPath = path.join(this.getHtmlReportDir(), key, item.path);
       await mkdirp(path.dirname(itemPath));
@@ -162,7 +162,7 @@ export class BitrisePublisherPlugin
     }
   }
 
-  async fetchArtifact(key: string) {
+  protected async fetchArtifact(key: string) {
     let next;
     do {
       const builds = await this._buildsApi.buildList({
@@ -180,7 +180,7 @@ export class BitrisePublisherPlugin
     } while (next);
   }
 
-  async fetchBuildArtifact(buildSlug: string) {
+  protected async fetchBuildArtifact(buildSlug: string) {
     let next;
     do {
       let artifacts = await this._buildArtifactApi.artifactList({
@@ -232,14 +232,14 @@ export class BitrisePublisherPlugin
     });
   }
 
-  protected listItems(
+  override listItems(
     lastKey: string,
     prefix: string
   ): Promise<ObjectListResult> {
     return Promise.reject(new Error(`listItems: ${lastKey},${prefix}`));
   }
 
-  protected downloadItem(
+  override downloadItem(
     remoteItem: RemoteFileItem,
     item: FileItem
   ): Promise<FileItem> {
