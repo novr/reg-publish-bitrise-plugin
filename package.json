@@ -12,7 +12,8 @@
   },
   "keywords": [
     "reg",
-    "reg-suit-plugin"
+    "reg-suit-plugin",
+    "bitrise"
   ],
   "author": {
     "name": "novr",
@@ -29,10 +30,8 @@
   "dependencies": {
     "@novr/bitrise-api": "^0.1.5",
     "fflate": "^0.8.2",
-    "lodash": "^4.17.21",
     "mkdirp": "^3.0.1",
-    "reg-suit-util": "^0.14.3",
-    "uuid": "^9.0.0"
+    "reg-suit-util": "^0.14.3"
   },
   "devDependencies": {
     "@types/mkdirp": "2.0.0",
