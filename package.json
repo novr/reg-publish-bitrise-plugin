@@ -1,9 +1,9 @@
 {
-  "name": "@novr/reg-publish-bitrise-plugin",
-  "version": "0.3.1",
+  "name": "reg-publish-bitrise-plugin",
+  "version": "0.4.0",
   "description": "Fetch and publish snapshot images to Bitrise.",
   "regSuitPlugin": {
-    "recommended": true
+    "recommended": false
   },
   "main": "lib/index.js",
   "scripts": {
@@ -12,7 +12,8 @@
   },
   "keywords": [
     "reg",
-    "reg-suit-plugin"
+    "reg-suit-plugin",
+    "bitrise"
   ],
   "author": {
     "name": "novr",
@@ -29,15 +30,17 @@
   "dependencies": {
     "@novr/bitrise-api": "^0.1.5",
     "fflate": "^0.8.2",
-    "lodash": "^4.17.21",
     "mkdirp": "^3.0.1",
-    "reg-suit-util": "^0.14.3",
-    "uuid": "^9.0.0"
+    "reg-suit-util": "^0.14.3"
   },
   "devDependencies": {
     "@types/mkdirp": "2.0.0",
-    "@types/node": "20.11.27",
+    "@types/node": "20.11.30",
     "reg-suit-interface": "^0.14.2",
-    "typescript": "5.4.2"
+    "typescript": "5.4.3"
+  },
+  "resolutions": {
+    "mkdirp": "3.0.1",
+    "@types/mkdirp": "2.0.0"
   }
 }
