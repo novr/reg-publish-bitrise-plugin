@@ -1,9 +1,9 @@
 {
-  "name": "@novr/reg-publish-bitrise-plugin",
-  "version": "0.3.1",
+  "name": "reg-publish-bitrise-plugin",
+  "version": "0.4.0",
   "description": "Fetch and publish snapshot images to Bitrise.",
   "regSuitPlugin": {
-    "recommended": true
+    "recommended": false
   },
   "main": "lib/index.js",
   "scripts": {
