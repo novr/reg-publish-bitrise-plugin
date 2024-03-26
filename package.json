@@ -38,5 +38,9 @@
     "@types/node": "20.11.30",
     "reg-suit-interface": "^0.14.2",
     "typescript": "5.4.3"
+  },
+  "resolutions": {
+    "mkdirp": "3.0.1",
+    "@types/mkdirp": "2.0.0"
   }
 }
