@@ -1,0 +1,42 @@
+# Trusted publishing (OIDC): https://docs.npmjs.com/trusted-publishers
+# npmjs.com → Package → Settings → Trusted publishing → GitHub Actions:
+#   workflow file name must be exactly: publish.yml
+
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn run build
+
+      - name: Verify git tag matches package.json version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test "${GITHUB_REF}" = "refs/tags/v${VERSION}"
+
+      - name: Publish to npm (OIDC)
+        run: npm publish --access public
