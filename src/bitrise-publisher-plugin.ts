@@ -109,23 +109,17 @@ export class BitrisePublisherPlugin
   publish(key: string) {
     return this.publishInternal(key).then(async (result) => {
       await this.compress(result.items, `${this.getArtifactName()}.zip`);
-      const reportUrl = `${this.getBuildUrl()}/?tab=artifacts`;
+      const buildUrl = this.getBuildUrl();
+      const reportUrl = buildUrl ? `${buildUrl}/?tab=artifacts` : "";
       return { reportUrl };
     });
   }
 
-  override uploadItem(key: string, item: FileItem): Promise<FileItem> {
-    return new Promise(async (resolve, reject) => {
-      const itemPath = path.join(this.getHtmlReportDir(), key, item.path);
-      await mkdirp(path.dirname(itemPath));
-      fs.copyFile(item.absPath, itemPath, (error) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(item);
-        }
-      });
-    });
+  override async uploadItem(key: string, item: FileItem): Promise<FileItem> {
+    const itemPath = path.join(this.getHtmlReportDir(), key, item.path);
+    await mkdirp(path.dirname(itemPath));
+    await fs.promises.copyFile(item.absPath, itemPath);
+    return item;
   }
 
   protected async compress(
@@ -203,34 +197,31 @@ export class BitrisePublisherPlugin
     } while (next);
   }
 
-  fetch(key: string): Promise<any> {
+  async fetch(key: string): Promise<any> {
     if (this.noEmit) return Promise.resolve();
     const progress = this.logger.getProgressBar();
-    return new Promise<any>(async (resolve, reject) => {
-      progress.start(1, 0);
-      this.logger.info(
-        `Download 1 files from ${this.logger.colors.magenta(
-          this.getBucketName()
-        )}.`
-      );
-      try {
-        const artifact = await this.fetchArtifact(key);
-        const fileItem = {
-          path: "",
-          absPath: this.getWorkingDirs().expectedDir,
-          mimeType: "",
-        } as FileItem;
-        if (artifact?.data?.expiringDownloadUrl) {
-          const remotePath = artifact?.data?.expiringDownloadUrl;
-          await this.downloadItem({ remotePath, key }, fileItem);
-          progress.increment(1);
-        }
-        progress.stop();
-        resolve(fileItem);
-      } catch (error) {
-        reject(error);
+    progress.start(1, 0);
+    this.logger.info(
+      `Download 1 files from ${this.logger.colors.magenta(
+        this.getBucketName()
+      )}.`
+    );
+    try {
+      const artifact = await this.fetchArtifact(key);
+      const fileItem = {
+        path: "",
+        absPath: this.getWorkingDirs().expectedDir,
+        mimeType: "",
+      } as FileItem;
+      if (artifact?.data?.expiringDownloadUrl) {
+        const remotePath = artifact.data.expiringDownloadUrl;
+        await this.downloadItem({ remotePath, key }, fileItem);
+        progress.increment(1);
       }
-    });
+      return fileItem;
+    } finally {
+      progress.stop();
+    }
   }
 
   override listItems(
@@ -240,42 +231,33 @@ export class BitrisePublisherPlugin
     return Promise.reject(new Error(`listItems: ${lastKey},${prefix}`));
   }
 
-  override downloadItem(
+  override async downloadItem(
     remoteItem: RemoteFileItem,
     item: FileItem
   ): Promise<FileItem> {
-    const actualPrefix = `${path.basename(this.getWorkingDirs().actualDir)}`;
-    return new Promise(async (resolve, reject) => {
-      try {
-        const response = await fetch(remoteItem.remotePath);
-        fflate.unzip(
-          new Uint8Array(await response.arrayBuffer()),
-          async (err, unzipped) => {
-            if (err) {
-              reject(err);
-            } else {
-              const promise = Object.entries(unzipped).map(
-                async ([filename, data]) => {
-                  const suffix = filename.replace(
-                    new RegExp(`^${actualPrefix}\/`),
-                    ""
-                  );
-                  const file = path.join(item.absPath, suffix);
-                  await mkdirp(path.dirname(file));
-                  fs.writeFileSync(file, data);
-                  this.logger.verbose(
-                    `Downloaded from ${remoteItem.key} to ${filename}`
-                  );
-                }
-              );
-              await Promise.all(promise);
-              resolve(item);
-            }
-          }
-        );
-      } catch (error) {
-        reject(error);
-      }
+    const actualPrefix = path.basename(this.getWorkingDirs().actualDir);
+    const prefixPattern = new RegExp(
+      `^${actualPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`
+    );
+    const response = await fetch(remoteItem.remotePath);
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    const unzipped = await new Promise<fflate.Unzipped>((resolve, reject) => {
+      fflate.unzip(buffer, (err, data) => {
+        if (err) reject(err);
+        else resolve(data);
+      });
     });
+    await Promise.all(
+      Object.entries(unzipped).map(async ([filename, data]) => {
+        const suffix = filename.replace(prefixPattern, "");
+        const file = path.join(item.absPath, suffix);
+        await mkdirp(path.dirname(file));
+        fs.writeFileSync(file, data);
+        this.logger.verbose(
+          `Downloaded from ${remoteItem.key} to ${filename}`
+        );
+      })
+    );
+    return item;
   }
 }
