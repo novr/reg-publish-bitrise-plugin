@@ -22,7 +22,7 @@ export interface PluginConfig {
   basePath?: string;
   apiKey: string;
   appSlug?: string;
-  successOnly?: Boolean;
+  successOnly?: boolean;
   artifactName?: string;
 }
 
@@ -32,7 +32,7 @@ export class BitrisePublisherPlugin
 {
   name = "reg-publish-bitrise-plugin";
 
-  private _options!: PluginCreateOptions<any>;
+  private _options!: PluginCreateOptions<PluginConfig>;
   private _pluginConfig!: PluginConfig;
   private _buildsApi!: BuildsApi;
   private _buildArtifactApi!: BuildArtifactApi;
