@@ -7,7 +7,7 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "prepublish": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "tsc -p tsconfig.build.json",
     "test": "echo skip"
   },
   "keywords": [
