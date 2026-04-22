@@ -163,12 +163,12 @@ export class BitrisePublisherPlugin
   }
 
   protected async fetchArtifact(key: string) {
-    let next;
+    let next: string | undefined;
     do {
       const builds = await this._buildsApi.buildList({
         appSlug: this.getAppSlug(),
         status: this._pluginConfig.successOnly ? 1 : undefined,
-        next: next,
+        next,
       });
       const targets =
         builds.data?.filter((f) => f.commitHash?.startsWith(key)) ?? [];
@@ -177,16 +177,17 @@ export class BitrisePublisherPlugin
           return await this.fetchBuildArtifact(build.slug);
         }
       }
+      next = builds.paging?.next;
     } while (next);
   }
 
   protected async fetchBuildArtifact(buildSlug: string) {
-    let next;
+    let next: string | undefined;
     do {
-      let artifacts = await this._buildArtifactApi.artifactList({
+      const artifacts = await this._buildArtifactApi.artifactList({
         appSlug: this.getAppSlug(),
         buildSlug: buildSlug,
-        next: next,
+        next,
       });
       const artifact = artifacts.data?.find((f) =>
         f.title?.startsWith(this.getArtifactName())
