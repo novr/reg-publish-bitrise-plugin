@@ -1,6 +1,6 @@
 {
   "name": "reg-publish-bitrise-plugin",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Fetch and publish snapshot images to Bitrise.",
   "regSuitPlugin": {
     "recommended": false
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@types/mkdirp": "2.0.0",
-    "@types/node": "24.12.2",
+    "@types/node": "25.6.0",
     "reg-suit-interface": "^0.14.2",
     "typescript": "6.0.3"
   },

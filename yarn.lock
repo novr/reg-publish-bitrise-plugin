@@ -6,9 +6,9 @@ __metadata:
   cacheKey: 10c0
 
 "@novr/bitrise-api@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@novr/bitrise-api@npm:0.2.0"
-  checksum: 10c0/85cde3fce1b425e6aaae0c5729d5bbb42945dc027f48f3517efa584e0c2684b277c4dc489b69899c09f005cb43f771f0913fe75219e923a100af0455e9266c26
+  version: 0.2.2
+  resolution: "@novr/bitrise-api@npm:0.2.2"
+  checksum: 10c0/40c7fd20e019df190d8a908eb8cc9e6fd0431ded11f37fadd582796ac3ccfaaac01a8c99638d704ea5cdcedf966e37eb8d156ad09fa6665481f797981079416f
   languageName: node
   linkType: hard
 
@@ -80,21 +80,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*":
+"@types/node@npm:*, @types/node@npm:25.6.0":
   version: 25.6.0
   resolution: "@types/node@npm:25.6.0"
   dependencies:
     undici-types: "npm:~7.19.0"
   checksum: 10c0/d2d2015630ff098a201407f55f5077a20270ae4f465c739b40865cd9933b91b9c5d2b85568eadaf3db0801b91e267333ca7eb39f007428b173d1cdab4b339ac5
-  languageName: node
-  linkType: hard
-
-"@types/node@npm:24.12.2":
-  version: 24.12.2
-  resolution: "@types/node@npm:24.12.2"
-  dependencies:
-    undici-types: "npm:~7.16.0"
-  checksum: 10c0/710050c42f89075c4479e4e1e4c2532486b0c41b1e2a8a13ad88641c88b88cdaea87414e19224f30028719737bd70e327edcaa184d50e86b9418941edd7eb02b
   languageName: node
   linkType: hard
 
@@ -318,7 +309,7 @@ __metadata:
   dependencies:
     "@novr/bitrise-api": "npm:^0.2.0"
     "@types/mkdirp": "npm:2.0.0"
-    "@types/node": "npm:24.12.2"
+    "@types/node": "npm:25.6.0"
     fflate: "npm:^0.8.2"
     mkdirp: "npm:^3.0.1"
     reg-suit-interface: "npm:^0.14.2"
@@ -419,13 +410,6 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 10c0/2f25c74e65663c248fa1ade2b8459d9ce5372ff9dad07067310f132966ebec1d93f6c42f0baf77a6b6a7a91460463f708e6887013aaade22111037457c6b25df
-  languageName: node
-  linkType: hard
-
-"undici-types@npm:~7.16.0":
-  version: 7.16.0
-  resolution: "undici-types@npm:7.16.0"
-  checksum: 10c0/3033e2f2b5c9f1504bdc5934646cb54e37ecaca0f9249c983f7b1fc2e87c6d18399ebb05dc7fd5419e02b2e915f734d872a65da2e3eeed1813951c427d33cc9a
   languageName: node
   linkType: hard
 
