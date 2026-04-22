@@ -1,4 +1,10 @@
 yarn.lock
+.yarn/
+.yarnrc.yml
+.nvmrc
+tsconfig.json
+tsconfig.build.json
+*.tsbuildinfo
 lib/**/*.spec.js
 src/
 test/
